@@ -48,27 +48,53 @@ private
   # Check whether an OSD has been provisioned 
   # Params:
   # +dev+:: Device short name e.g. sdd
-  def device_prepared?(dev)
+	lsblkpointversion = Puppet::Util::Execution.execute('lsblk --version|cut -d \'.\' -f2')
+  if lsblkpointversion < 25
+    def device_prepared?(dev)
+      if Dir.exists? '/dev/disk/by-parttypeuuid'
+        begin
+          partitions = Dir.entries('/dev/disk/by-parttypeuuid').select { |x| not x.start_with? '.' }
+        rescue Errno::ENOENT
+          return false
+        end
+      else
+        partitions = Puppet::Util::Execution.execute('lsblk -o parttype,kname').split(/\n/)
+      end
+      partitions.each do |partition|
+        if partition.start_with? OSD_UUID
     if Dir.exists? '/dev/disk/by-parttypeuuid'
-      begin
-        partitions = Dir.entries('/dev/disk/by-parttypeuuid').select { |x| not x.start_with? '.' }
-      rescue Errno::ENOENT
-        return false
-      end
+            target = File.readlink "/dev/disk/by-parttypeuuid/#{partition}"
     else
-      partitions = Puppet::Util::Execution.execute('lsblk -o parttype,kname').split(/\n/)
+      target = partition
     end
-    partitions.each do |partition|
-      if partition.start_with? OSD_UUID
-	if Dir.exists? '/dev/disk/by-parttypeuuid'
-          target = File.readlink "/dev/disk/by-parttypeuuid/#{partition}"
-	else
-	  target = partition
-	end
-        return true if /#{dev}\d+$/ =~ target
+          return true if /#{dev}\d+$/ =~ target
+        end
       end
+      false
     end
-    false
+	else
+   # +dev+:: Device short name e.g. sdd
+    def device_prepared?(dev)
+      if Dir.exists? '/dev/disk/by-parttypeuuid'
+        begin
+          partitions = Dir.entries('/dev/disk/by-parttypeuuid').select { |x| not x.start_with? '.' }
+        rescue Errno::ENOENT
+          return false
+        end
+      else
+        partitions = Puppet::Util::Execution.execute('bash -c "fdisk -l | grep -E \'^/dev/\'"').split(/\n/)
+      end
+      partitions.each do |partition|
+        if partition.start_with? OSD_UUID
+          target = File.readlink "/dev/disk/by-parttypeuuid/#{partition}"
+          return true if /#{dev}\d+$/ =~ target
+        elsif partition.end_with? 'Ceph OSD'
+          target = partition.split(/ /)[0]
+          return true if /#{dev}\d+$/ =~ target
+        end
+      end
+      false
+    end
   end
 
 public
