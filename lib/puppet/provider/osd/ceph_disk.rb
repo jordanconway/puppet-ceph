@@ -48,7 +48,7 @@ private
   # Check whether an OSD has been provisioned 
   # Params:
   # +dev+:: Device short name e.g. sdd
-	lsblkpointversion = Puppet::Util::Execution.execute('lsblk --version|cut -d \'.\' -f2')
+	lsblkpointversion = Puppet::Util::Execution.execute('lsblk --version|cut -d \'.\' -f2').to_i
   if lsblkpointversion < 25
     def device_prepared?(dev)
       if Dir.exists? '/dev/disk/by-parttypeuuid'
